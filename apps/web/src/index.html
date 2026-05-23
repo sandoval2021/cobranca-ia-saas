@@ -15,6 +15,10 @@
         <a href="/clientes" data-link>Clientes</a>
         <a href="/servidores" data-link>Servidores</a>
         <a href="/aplicativos" data-link>Aplicativos</a>
+        <a href="/cobrancas" data-link>Cobranças</a>
+        <a href="/pagamentos" data-link>Pagamentos</a>
+        <a href="/vencimentos" data-link>Vencimentos</a>
+        <a href="/resultados" data-link>Resultados</a>
       </nav>
     </header>
     <section id="feedback" class="feedback" hidden></section>
@@ -36,7 +40,51 @@ async function api(path, opt={}){
   return data;
 }
 
-function statusClass(status=''){ return String(status).toLowerCase().replace(/\s+/g,'-'); }
+function statusClass(status=''){ return String(status).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-'); }
+
+function money(cents){ return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((Number(cents)||0)/100); }
+function financeCard(item, showFee=false){
+  return `<article class="mini-card premium">
+  <div class="row between"><strong>${item.external_reference||item.provider_payment_id||item.id}</strong><span class="badge ${statusClass(item.ui_status||item.status||'')}">${item.ui_status||item.status||'n/a'}</span></div>
+  <div class="meta">Cliente: ${item.customer_id||'N/D'} · ${new Date(item.created_at||Date.now()).toLocaleString('pt-BR')}</div>
+  <div class="chips"><span class="chip" style="--chip:#3b82f6">Valor: ${money(item.amount_cents||item.paid_amount_cents||item.charge_amount_cents||0)}</span>${showFee?`<span class="chip" style="--chip:#8b5cf6">Taxa plataforma: ${money(item.platform_fee_cents||0)}</span>`:''}</div>
+  ${item.due_date?`<div class="meta">Vencimento: ${item.due_date}</div>`:''}
+  </article>`;
+}
+
+async function renderFinanceList(kind){
+  const app=el('app');
+  app.innerHTML=`<section class="card"><h2>${kind}</h2><form id="fFinance" class="grid"><input name="q" placeholder="Buscar"/><select name="status"><option value="">Todos status</option><option>pago</option><option>pendente</option><option>vencido</option><option>cancelado</option><option>aguardando confirmação</option></select><button>Filtrar</button></form><div id="finList" class="list">${Array.from({length:3}).map(()=>'<div class="skeleton"></div>').join('')}</div></section>`;
+  async function load(){
+    const fd=new FormData(el('fFinance')); const q=fd.get('q')||''; const status=fd.get('status')||'';
+    try{
+      let endpoint='/financeiro/cobrancas';
+      if(kind==='Pagamentos') endpoint='/financeiro/pagamentos';
+      const data=await api(`${endpoint}?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`);
+      const items=data.items||[];
+      el('finList').innerHTML=items.length?items.map(i=>financeCard(i, kind==='Cobranças')).join(''):'<p>Sem registros por aqui ainda. Ajuste os filtros para continuar.</p>';
+    }catch(err){ el('finList').innerHTML='<p>Não conseguimos carregar agora. Tente novamente em instantes.</p>'; }
+  }
+  el('fFinance').onsubmit=(e)=>{e.preventDefault(); load();};
+  load();
+}
+
+async function renderVencimentos(){
+  const app=el('app');
+  app.innerHTML='<section class="card"><h2>Vencimentos próximos</h2><div id="venList" class="list"><div class="skeleton"></div><div class="skeleton"></div></div></section>';
+  try{const data=await api('/financeiro/vencimentos'); const items=data.items||[]; el('venList').innerHTML=items.length?items.map(i=>financeCard(i,true)).join(''):'<p>Nenhum vencimento para os próximos dias.</p>';}
+  catch(e){el('venList').innerHTML='<p>Falha ao carregar vencimentos.</p>';}
+}
+
+async function renderResultados(){
+  const app=el('app');
+  app.innerHTML='<section class="card"><h2>Resultados</h2><div id="resumo"></div><h3>Histórico financeiro</h3><div id="hist" class="list"><div class="skeleton"></div></div></section>';
+  try{const [resumo,hist]=await Promise.all([api('/financeiro/resumo-dono'),api('/financeiro/historico')]);
+    el('resumo').innerHTML=`<div class="chips"><span class="chip" style="--chip:#22c55e">Recebidos: ${resumo.recebidos||0}</span><span class="chip" style="--chip:#f59e0b">Pendentes: ${resumo.pendentes||0}</span><span class="chip" style="--chip:#3b82f6">Volume: ${money(resumo.volume_cents||0)}</span><span class="chip" style="--chip:#8b5cf6">Taxas: ${money(resumo.taxas_plataforma_cents||0)}</span></div>`;
+    const items=hist.items||[]; el('hist').innerHTML=items.length?items.map(i=>financeCard(i,false)).join(''):'<p>Histórico ainda vazio.</p>'; }
+  catch(e){el('hist').innerHTML='<p>Não foi possível carregar os resultados.</p>';}
+}
+
 
 function customerCard(c){
   const app = state.apps.find(a=>a.id===c.app_id);
@@ -154,6 +202,10 @@ async function router(){
     const p = location.pathname;
     if(p==='/servidores') return renderServidores();
     if(p==='/aplicativos') return renderAplicativos();
+    if(p==='/cobrancas') return renderFinanceList('Cobranças');
+    if(p==='/pagamentos') return renderFinanceList('Pagamentos');
+    if(p==='/vencimentos') return renderVencimentos();
+    if(p==='/resultados') return renderResultados();
     return renderClientes();
   } catch (err){ setFeedback(err.message,'err'); el('app').innerHTML='<section class="card"><p>Erro ao carregar dados. Tente novamente.</p></section>'; }
 }
