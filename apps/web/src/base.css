@@ -14,3 +14,7 @@ button{background:#2d4fd8;border:0}.ghost{background:#223051}
 .premium{border:1px solid #2f3d63}.skeleton{height:92px;border-radius:12px;background:linear-gradient(90deg,#1a2440,#223057,#1a2440);background-size:200% 100%;animation:sk 1.2s infinite}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
 @media (min-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid>textarea,.grid>button,.grid>#dynamicFields{grid-column:1/-1}}
+.wa-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.wa-qr{width:100%;max-width:280px;display:block;margin:10px auto;border-radius:12px;background:#fff;padding:8px}
+.badge.conectado{background:#1c5e3a}.badge.desconectado{background:#6d2431}.badge.conectando{background:#1d4ed8}.badge.pausado{background:#7b4e12}.badge.falha{background:#991b1b}
+@media (max-width:480px){.container{padding:10px}.card,.topbar{padding:10px}.wa-actions{grid-template-columns:1fr}}

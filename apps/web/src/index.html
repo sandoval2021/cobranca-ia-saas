@@ -19,6 +19,7 @@
         <a href="/pagamentos" data-link>Pagamentos</a>
         <a href="/vencimentos" data-link>Vencimentos</a>
         <a href="/resultados" data-link>Resultados</a>
+        <a href="/whatsapp" data-link>WhatsApp</a>
       </nav>
     </header>
     <section id="feedback" class="feedback" hidden></section>
@@ -27,7 +28,7 @@
 <script>
 const API = 'http://localhost:3001';
 const AUTH = {'x-company-id':'company-demo','x-user-id':'owner-demo','x-role':'owner','content-type':'application/json'};
-const state = { customers: [], servers: [], apps: [], loading: false, selectedApp: null };
+const state = { customers: [], servers: [], apps: [], loading: false, selectedApp: null, whatsapp: {status:null,qr:null,panel:null,admin:null,history:null,queue:null,polling:false} };
 
 function mask(v){ if(!v) return '••••'; return '••••'; }
 function el(id){ return document.getElementById(id); }
@@ -83,6 +84,83 @@ async function renderResultados(){
     el('resumo').innerHTML=`<div class="chips"><span class="chip" style="--chip:#22c55e">Recebidos: ${resumo.recebidos||0}</span><span class="chip" style="--chip:#f59e0b">Pendentes: ${resumo.pendentes||0}</span><span class="chip" style="--chip:#3b82f6">Volume: ${money(resumo.volume_cents||0)}</span><span class="chip" style="--chip:#8b5cf6">Taxas: ${money(resumo.taxas_plataforma_cents||0)}</span></div>`;
     const items=hist.items||[]; el('hist').innerHTML=items.length?items.map(i=>financeCard(i,false)).join(''):'<p>Histórico ainda vazio.</p>'; }
   catch(e){el('hist').innerHTML='<p>Não foi possível carregar os resultados.</p>';}
+}
+
+
+
+function statusLabel(s='desconectado'){ const map={conectado:'Conectado',desconectado:'Desconectado',conectando:'Conectando',pausado:'Pausado',falha:'Falha'}; return map[s]||'Desconectado'; }
+function safeDate(v){ if(!v) return 'Sem registro'; const d=new Date(v); return Number.isNaN(d.getTime())?'Sem registro':d.toLocaleString('pt-BR'); }
+
+const waPoll = { timer:null, inFlight:false, errorCount:0, stopUntil:0, active:false };
+function stopWaPolling(){ waPoll.active=false; if(waPoll.timer){ clearTimeout(waPoll.timer); waPoll.timer=null; } waPoll.inFlight=false; }
+function scheduleWaPoll(fn,delay=8000){ if(!waPoll.active) return; if(document.hidden) return; if(waPoll.timer) clearTimeout(waPoll.timer); waPoll.timer=setTimeout(fn,delay); }
+
+async function renderWhatsapp(){
+  const app=el('app');
+  app.innerHTML=`<section class="card"><h2>WhatsApp operacional</h2>
+  <div id="waStatus" class="list"><div class="skeleton"></div></div>
+  <div class="wa-actions">
+    <button data-wa-action="conectar">Conectar</button><button data-wa-action="reconectar" class="ghost">Reconectar</button><button data-wa-action="desconectar" class="ghost">Desconectar</button>
+    <button data-wa-action="qr" class="ghost">Atualizar QR</button><button data-wa-action="pausar" class="ghost">Pausar fila</button><button data-wa-action="retomar" class="ghost">Retomar fila</button>
+  </div>
+  <div id="waQr" class="mini-card"><div class="skeleton"></div></div>
+  <h3>Fila operacional</h3><div id="waQueue" class="list"><div class="skeleton"></div></div>
+  <h3>Histórico operacional</h3><div id="waHistory" class="list"><div class="skeleton"></div></div>
+  <h3>Painel Admin</h3><div id="waAdmin" class="list"><p class="meta">Disponível para administradores.</p></div>
+  </section>`;
+
+  async function act(kind){
+    try{
+      if(kind==='conectar') await api('/whatsapp/instancia/criar',{method:'POST',body:JSON.stringify({instance_name:'empresa_company-demo'})});
+      if(kind==='reconectar') await api('/whatsapp/instancia/reconectar',{method:'POST'});
+      if(kind==='desconectar') await api('/whatsapp/instancia/desconectar',{method:'POST'});
+      if(kind==='qr') await api('/whatsapp/instancia/reconectar',{method:'POST'});
+      if(kind==='pausar') await api('/whatsapp/fila/pausar',{method:'POST'});
+      if(kind==='retomar') await api('/whatsapp/fila/retomar',{method:'POST'});
+      setFeedback('Ação concluída com sucesso.');
+      await loadWa(true);
+    }catch(e){ setFeedback(e.message,'err'); }
+  }
+  document.querySelectorAll('[data-wa-action]').forEach(b=>b.onclick=()=>act(b.dataset.waAction));
+
+  stopWaPolling();
+  waPoll.active=true;
+  async function loadWa(force=false){
+    if(waPoll.inFlight) return;
+    if(document.hidden) return scheduleWaPoll(loadWa,8000);
+    if(Date.now()<waPoll.stopUntil) return scheduleWaPoll(loadWa,8000);
+    waPoll.inFlight=true;
+    try{
+      const [status,qr,panel,history,queue]=await Promise.all([
+        api('/whatsapp/instancia/status'),
+        api('/whatsapp/instancia/qr'),
+        api('/whatsapp/painel-dono'),
+        api('/whatsapp/operacional/historico').catch(()=>({items:[]})),
+        api('/whatsapp/operacional/fila').catch(()=>({}))
+      ]);
+      waPoll.errorCount=0; waPoll.stopUntil=0;
+      state.whatsapp={...state.whatsapp,status,qr,panel,history,queue};
+      const st=status?.status||'desconectado';
+      el('waStatus').innerHTML=`<article class="mini-card"><div class="row between"><strong>Status da conexão</strong><span class="badge ${statusClass(st)}">${statusLabel(st)}</span></div><div class="meta">Última conexão: ${safeDate(status?.last_connected_at)}</div><div class="chips"><span class="chip" style="--chip:#3b82f6">Mensagens hoje: ${status?.sent_today||0}</span><span class="chip" style="--chip:#f59e0b">Limite diário: ${status?.daily_limit||0}</span></div></article>`;
+      const qrv=qr?.qr_code;
+      el('waQr').innerHTML=`<div class="row between"><strong>QR Code</strong><span class="meta">Atualização automática leve</span></div>${qrv?`<img class="wa-qr" src="https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrv)}" alt="QR para conectar WhatsApp">`:'<p class="meta">QR ainda não disponível. Toque em “Atualizar QR”.</p>'}`;
+      const queueData=queue||{};
+      el('waQueue').innerHTML=`<article class="mini-card"><div class="chips"><span class="chip" style="--chip:#64748b">Pendente: ${queueData.pendente||0}</span><span class="chip" style="--chip:#0ea5e9">Enviando: ${queueData.enviando||0}</span><span class="chip" style="--chip:#ef4444">Falhou: ${queueData.falhou||0}</span><span class="chip" style="--chip:#f59e0b">Retries: ${queueData.retries||0}</span><span class="chip" style="--chip:#8b5cf6">Pausada: ${queueData.pausada?'Sim':'Não'}</span></div></article>`;
+      const items=history?.items||[];
+      el('waHistory').innerHTML=items.length?items.map(i=>`<article class="mini-card"><div class="row between"><strong>${i.tipo||'Mensagem'}</strong><span class="badge ${statusClass(i.status||'pendente')}">${i.status||'pendente'}</span></div><div class="meta">${safeDate(i.data)} · retries: ${i.retries||0}</div><div class="meta">${i.descricao||'Sem detalhes'}</div></article>`).join(''):'<p class="meta">Sem histórico operacional recente.</p>';
+      try { const admin=await api('/admin/whatsapp/painel'); el('waAdmin').innerHTML=`<article class="mini-card"><div class="chips"><span class="chip" style="--chip:#ef4444">Desconectadas: ${admin.disconnected||0}</span><span class="chip" style="--chip:#f59e0b">Pausadas: ${admin.paused||0}</span><span class="chip" style="--chip:#eab308">Risco spam: ${admin.spam_risk_companies||0}</span><span class="chip" style="--chip:#dc2626">Falhas excessivas: ${admin.excessive_failures||0}</span><span class="chip" style="--chip:#7c3aed">Filas travadas: ${admin.stuck_queues||0}</span><span class="chip" style="--chip:#22c55e">Volume: ${admin.total_msgs||0}</span></div></article>`; } catch {}
+    }catch(err){
+      waPoll.errorCount +=1;
+      if(force) setFeedback('Não foi possível atualizar o WhatsApp agora.','err');
+      if(waPoll.errorCount>=3){
+        waPoll.stopUntil=Date.now()+30000;
+        setFeedback('Detectamos falhas seguidas. Vamos tentar novamente em instantes.','err');
+      }
+      el('waStatus').innerHTML='<p class="meta">Não conseguimos carregar o status agora.</p>';
+    } finally { waPoll.inFlight=false; }
+    if(location.pathname==='/whatsapp' && waPoll.active) scheduleWaPoll(loadWa,8000);
+  }
+  await loadWa(true);
 }
 
 
@@ -197,6 +275,7 @@ async function renderAplicativos(){
 
 async function router(){
   setFeedback('');
+  if(location.pathname!=='/whatsapp') stopWaPolling();
   try {
     await loadBase();
     const p = location.pathname;
@@ -206,11 +285,13 @@ async function router(){
     if(p==='/pagamentos') return renderFinanceList('Pagamentos');
     if(p==='/vencimentos') return renderVencimentos();
     if(p==='/resultados') return renderResultados();
+    if(p==='/whatsapp') return renderWhatsapp();
     return renderClientes();
   } catch (err){ setFeedback(err.message,'err'); el('app').innerHTML='<section class="card"><p>Erro ao carregar dados. Tente novamente.</p></section>'; }
 }
 
 document.addEventListener('click', e=>{ const a=e.target.closest('[data-link]'); if(!a) return; e.preventDefault(); history.pushState({},'',a.getAttribute('href')); router();});
+document.addEventListener('visibilitychange',()=>{ if(location.pathname!=='/whatsapp') return; if(document.hidden){ stopWaPolling(); } else { renderWhatsapp(); } });
 window.addEventListener('popstate', router);
 router();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}
