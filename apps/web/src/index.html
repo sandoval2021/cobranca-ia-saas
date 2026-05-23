@@ -20,6 +20,7 @@
         <a href="/vencimentos" data-link>Vencimentos</a>
         <a href="/resultados" data-link>Resultados</a>
         <a href="/whatsapp" data-link>WhatsApp</a>
+        <a href="/assistente" data-link>Assistente IA</a>
       </nav>
     </header>
     <section id="feedback" class="feedback" hidden></section>
@@ -95,6 +96,47 @@ const waPoll = { timer:null, inFlight:false, errorCount:0, stopUntil:0, active:f
 function stopWaPolling(){ waPoll.active=false; if(waPoll.timer){ clearTimeout(waPoll.timer); waPoll.timer=null; } waPoll.inFlight=false; }
 function scheduleWaPoll(fn,delay=8000){ if(!waPoll.active) return; if(document.hidden) return; if(waPoll.timer) clearTimeout(waPoll.timer); waPoll.timer=setTimeout(fn,delay); }
 
+
+
+const iaPoll={timer:null,inFlight:false,active:false,errorCount:0,stopUntil:0};
+function stopIaPolling(){iaPoll.active=false;if(iaPoll.timer) clearTimeout(iaPoll.timer);iaPoll.timer=null;iaPoll.inFlight=false;}
+function scheduleIaPoll(fn,delay=10000){ if(!iaPoll.active||document.hidden) return; if(iaPoll.timer) clearTimeout(iaPoll.timer); iaPoll.timer=setTimeout(fn,delay);}
+function iaStatusLabel(v=''){const map={ativa:'Ativa',pausada:'Pausada',limitada:'Limitada',bloqueada:'Bloqueada',aguardando_humano:'Aguardando humano',erro_operacional:'Erro operacional'};return map[v]||v||'Ativa';}
+async function renderAssistente(){
+ const app=el('app');
+ app.innerHTML=`<section class="card"><h2>Assistente IA</h2><div id="iaResumo" class="list"><div class="skeleton"></div></div><h3>Configurações IA empresa</h3><form id="iaCfg" class="grid"><label><input type="checkbox" name="enabled"> IA ativa</label><input type="time" name="operating_start"><input type="time" name="operating_end"><input type="number" name="daily_token_limit" placeholder="Limite diário"><input type="number" name="monthly_token_limit" placeholder="Limite mensal"><label><input type="checkbox" name="economic_mode"> Modo econômico</label><label><input type="checkbox" name="fallback_auto"> Fallback automático</label><button>Salvar</button></form><h3>Handoff humano</h3><div id="iaHandoff" class="list"><div class="skeleton"></div></div><h3>Histórico IA</h3><div id="iaHist" class="list"><div class="skeleton"></div></div><div class="row between"><button id="iaPrev" class="ghost">Anterior</button><button id="iaNext" class="ghost">Próxima</button></div><h3>Guardrails</h3><div id="iaGuards" class="list"><div class="skeleton"></div></div><h3>Painel IA Admin</h3><div id="iaAdmin" class="list"><p class="meta">Disponível para administradores.</p></div></section>`;
+ let page=1;
+ async function load(){
+  if(iaPoll.inFlight) return;
+  if(document.hidden) return scheduleIaPoll(load,10000);
+  if(Date.now()<iaPoll.stopUntil) return scheduleIaPoll(load,10000);
+  iaPoll.inFlight=true;
+  try{
+   const [dono,hist,handoff,guards,cfg]=await Promise.all([api('/ia/painel-dono'),api(`/ia/historico?page=${page}&limit=8`),api('/ia/handoff/fila'),api('/ia/guardrails/eventos'),api('/ia/configuracao')]);
+   iaPoll.errorCount=0; iaPoll.stopUntil=0;
+   el('iaResumo').innerHTML=`<article class="mini-card"><div class="row between"><strong>Status IA</strong><span class="badge ${statusClass(dono.status_ia||'ativa')}">${iaStatusLabel(dono.status_ia)}</span></div><div class="chips"><span class="chip" style="--chip:#3b82f6">Consumo diário: ${dono.consumo_diario||0}</span><span class="chip" style="--chip:#8b5cf6">Consumo mensal: ${dono.consumo_mensal||0}</span><span class="chip" style="--chip:#22c55e">Mensagens: ${dono.mensagens_respondidas||0}</span><span class="chip" style="--chip:#f59e0b">Custo estimado: ${money(dono.custo_estimado_cents||0)}</span><span class="chip" style="--chip:#64748b">Modelo: ${dono.modelo_usado||'n/d'}</span><span class="chip" style="--chip:#ef4444">Fallback: ${dono.fallback_ativo?'Ativo':'Inativo'}</span><span class="chip" style="--chip:#0ea5e9">Limite restante: ${dono.limite_restante_tokens||0}</span></div></article>`;
+   el('iaCfg').enabled.checked=!!cfg.enabled; el('iaCfg').daily_token_limit.value=cfg.daily_token_limit||''; el('iaCfg').monthly_token_limit.value=cfg.monthly_token_limit||'';
+   el('iaHandoff').innerHTML=`<article class="mini-card"><div class="chips"><span class="chip" style="--chip:#ef4444">Aguardando humano: ${handoff.aguardando_humano||0}</span><span class="chip" style="--chip:#f59e0b">Fila humana: ${(handoff.fila_humana||[]).length}</span><span class="chip" style="--chip:#22c55e">Status: ${handoff.status_operacional||'estavel'}</span></div>${(handoff.fila_humana||[]).map(i=>`<div class='row between'><span>${i.conversation_id.slice(0,8)} · ${i.status}</span><span><button data-assumir='${i.conversation_id}' class='ghost'>Assumir conversa</button> <button data-retomar='${i.conversation_id}' class='ghost'>Devolver para IA</button></span></div>`).join('')}</article>`;
+   const items=hist.items||[]; el('iaHist').innerHTML=items.length?items.map(i=>`<article class='mini-card'><div class='row between'><strong>${i.intencao||'n/d'}</strong><span class='badge ${statusClass(i.status||'ativa')}'>${i.status||'ativa'}</span></div><div class='meta'>Cliente: ${i.pergunta_cliente||'-'}</div><div class='meta'>IA: ${i.resposta_ia||'-'}</div><div class='meta'>${safeDate(i.horario)} · ${i.tempo_resposta_ms||0}ms · handoff: ${i.handoff_humano?'Sim':'Não'}</div><div class='meta'>Guardrail: ${i.bloqueio_guardrail||'Sem bloqueio'}</div></article>`).join(''):'<p class="meta">Histórico ainda vazio.</p>';
+   const gs=guards.items||[]; el('iaGuards').innerHTML=gs.length?gs.map(g=>`<article class='mini-card'><strong>${g.evento}</strong><div class='meta'>Ação proibida: ${g.acao_proibida||'n/d'} · confirmação financeira bloqueada: ${g.confirmacao_financeira_bloqueada?'Sim':'Não'} · limite excedido: ${g.limite_excedido?'Sim':'Não'}</div></article>`).join(''):'<p class="meta">Nenhum evento de guardrail.</p>';
+   try{const admin=await api('/admin/ia/painel');el('iaAdmin').innerHTML=`<article class='mini-card'><div class='chips'><span class='chip' style='--chip:#3b82f6'>Maior consumo: ${(admin.empresas_maior_consumo||[]).length}</span><span class='chip' style='--chip:#f59e0b'>Limitadas: ${admin.empresas_limitadas||0}</span><span class='chip' style='--chip:#ef4444'>Erros IA: ${admin.erros_ia||0}</span><span class='chip' style='--chip:#8b5cf6'>Fallback ativo: ${admin.fallback_ativo||0}</span><span class='chip' style='--chip:#dc2626'>Risco custo: ${admin.risco_custo||0}</span><span class='chip' style='--chip:#22c55e'>Uso OpenAI: ${admin.uso_openai_tokens||0}</span><span class='chip' style='--chip:#64748b'>Pausadas: ${admin.empresas_pausadas||0}</span></div></article>`;}catch{}
+   document.querySelectorAll('[data-assumir]').forEach(b=>b.onclick=async()=>{await api(`/ia/handoff/${b.dataset.assumir}/assumir`,{method:'POST'});load();});
+   document.querySelectorAll('[data-retomar]').forEach(b=>b.onclick=async()=>{await api(`/ia/handoff/${b.dataset.retomar}/retomar-ia`,{method:'POST'});load();});
+  }catch(e){
+   iaPoll.errorCount=(iaPoll.errorCount||0)+1;
+   if(iaPoll.errorCount>=3){
+     iaPoll.stopUntil=Date.now()+30000;
+     setFeedback('Detectamos falhas seguidas no Assistente IA. Vamos tentar novamente em instantes.','err');
+   }
+   el('iaResumo').innerHTML='<p class="meta">Erro operacional ao carregar IA.</p>';
+  }
+  finally{iaPoll.inFlight=false;}
+  if(location.pathname==='/assistente'&&iaPoll.active) scheduleIaPoll(load,10000);
+ }
+ el('iaPrev').onclick=()=>{page=Math.max(1,page-1);load();}; el('iaNext').onclick=()=>{page+=1;load();};
+ el('iaCfg').onsubmit=async(e)=>{e.preventDefault(); const fd=new FormData(e.target); const body={enabled:fd.get('enabled')==='on',daily_token_limit:Number(fd.get('daily_token_limit')||0),monthly_token_limit:Number(fd.get('monthly_token_limit')||0),operating_start:fd.get('operating_start')||null,operating_end:fd.get('operating_end')||null,economic_mode:fd.get('economic_mode')==='on',fallback_auto:fd.get('fallback_auto')==='on'}; await api('/ia/configuracao',{method:'PATCH',body:JSON.stringify(body)}); setFeedback('Configuração da IA atualizada.'); load();};
+ stopIaPolling(); iaPoll.active=true; await load();
+}
 async function renderWhatsapp(){
   const app=el('app');
   app.innerHTML=`<section class="card"><h2>WhatsApp operacional</h2>
@@ -276,6 +318,7 @@ async function renderAplicativos(){
 async function router(){
   setFeedback('');
   if(location.pathname!=='/whatsapp') stopWaPolling();
+  if(location.pathname!=='/assistente') stopIaPolling();
   try {
     await loadBase();
     const p = location.pathname;
@@ -286,12 +329,16 @@ async function router(){
     if(p==='/vencimentos') return renderVencimentos();
     if(p==='/resultados') return renderResultados();
     if(p==='/whatsapp') return renderWhatsapp();
+    if(p==='/assistente') return renderAssistente();
     return renderClientes();
   } catch (err){ setFeedback(err.message,'err'); el('app').innerHTML='<section class="card"><p>Erro ao carregar dados. Tente novamente.</p></section>'; }
 }
 
 document.addEventListener('click', e=>{ const a=e.target.closest('[data-link]'); if(!a) return; e.preventDefault(); history.pushState({},'',a.getAttribute('href')); router();});
-document.addEventListener('visibilitychange',()=>{ if(location.pathname!=='/whatsapp') return; if(document.hidden){ stopWaPolling(); } else { renderWhatsapp(); } });
+document.addEventListener('visibilitychange',()=>{
+  if(location.pathname==='/whatsapp'){ if(document.hidden){ stopWaPolling(); } else { renderWhatsapp(); } return; }
+  if(location.pathname==='/assistente'){ if(document.hidden){ stopIaPolling(); } else { renderAssistente(); } }
+});
 window.addEventListener('popstate', router);
 router();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}
