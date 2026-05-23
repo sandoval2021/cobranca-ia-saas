@@ -1,0 +1,6 @@
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden;font-family:system-ui}
+.container{max-width:720px;margin:0 auto;padding:12px;display:grid;gap:12px}
+.card{border:1px solid #ddd;border-radius:12px;padding:12px;background:#fff}
+button,input,select{max-width:100%}
+.sr-only{position:absolute;left:-9999px}
