@@ -7,6 +7,10 @@ async function aiRouter(req,res){const ctx=getCtx(req);
  if(req.method==='POST'&&req.url==='/ia/processar-mensagem'){const b=await parseBody(req);const r=await ai.processMessage(ctx,b);res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify(r));}
  if(req.method==='POST'&&req.url.match(/^\/ia\/handoff\/[^/]+\/(abrir|assumir|retomar-ia)$/)){const parts=req.url.split('/');const cid=parts[3];const action=parts[4]==='retomar-ia'?'retomar':parts[4];const r=await ai.handoffAction(ctx,cid,action);res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify(r));}
  if(req.method==='GET'&&req.url==='/ia/painel-dono'){const r=ai.ownerPanel(ctx);res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify(r));}
+
+ if(req.method==='GET'&&req.url.startsWith('/ia/historico')){const u=new URL(req.url,'http://localhost');const r=ai.aiHistory(ctx,u.searchParams.get('page'),u.searchParams.get('limit'));res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify(r));}
+ if(req.method==='GET'&&req.url==='/ia/handoff/fila'){const r=ai.handoffQueue(ctx);res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify(r));}
+ if(req.method==='GET'&&req.url==='/ia/guardrails/eventos'){const r=ai.guardrailEvents(ctx);res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify(r));}
  if(req.method==='GET'&&req.url==='/admin/ia/painel'){const r=ai.adminPanel(ctx);res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify(r));}
  return false;}
 module.exports={aiRouter};
