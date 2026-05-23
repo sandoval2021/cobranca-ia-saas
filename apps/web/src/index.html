@@ -1,1 +1,167 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><link rel="manifest" href="/manifest.webmanifest"><title>Cobrança IA</title><link rel="stylesheet" href="/src/base.css"></head><body><main class="container"><section class="card"><h1>IA operacional</h1><p>Respostas com contexto real, controle de custo e suporte humano.</p><p><strong>Aviso:</strong> A IA não confirma pagamento nem renovação.</p></section><section class="card"><h2>Controle</h2><p>Ative, pause e acompanhe consumo e transferências para humano.</p></section></main><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}</script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>Cobrança IA · Premium Ops</title>
+  <link rel="stylesheet" href="/src/base.css">
+</head>
+<body>
+  <main class="container">
+    <header class="topbar">
+      <h1>Painel Operacional</h1>
+      <nav class="tabs">
+        <a href="/clientes" data-link>Clientes</a>
+        <a href="/servidores" data-link>Servidores</a>
+        <a href="/aplicativos" data-link>Aplicativos</a>
+      </nav>
+    </header>
+    <section id="feedback" class="feedback" hidden></section>
+    <section id="app"></section>
+  </main>
+<script>
+const API = 'http://localhost:3001';
+const AUTH = {'x-company-id':'company-demo','x-user-id':'owner-demo','x-role':'owner','content-type':'application/json'};
+const state = { customers: [], servers: [], apps: [], loading: false, selectedApp: null };
+
+function mask(v){ if(!v) return '••••'; return '••••'; }
+function el(id){ return document.getElementById(id); }
+function setFeedback(msg,type='ok'){ const box=el('feedback'); box.hidden=!msg; box.className=`feedback ${type}`; box.textContent=msg||''; }
+
+async function api(path, opt={}){
+  const res = await fetch(`${API}${path}`, { ...opt, headers: {...AUTH, ...(opt.headers||{})} });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.erro || 'Não foi possível concluir a ação agora.');
+  return data;
+}
+
+function statusClass(status=''){ return String(status).toLowerCase().replace(/\s+/g,'-'); }
+
+function customerCard(c){
+  const app = state.apps.find(a=>a.id===c.app_id);
+  const server = state.servers.find(s=>s.id===c.primary_server_id);
+  return `<article class="mini-card">
+    <div class="row between"><strong>${c.name||'Sem nome'}</strong><span class="badge ${statusClass(c.status)}">${c.status||'n/a'}</span></div>
+    <div class="meta">${c.whatsapp_e164||'Sem telefone'}</div>
+    <div class="chips">
+      <span class="chip" style="--chip:${server?.color||'#777'}">Servidor: ${server?.name||'N/D'}</span>
+      <span class="chip" style="--chip:${app?.color||'#888'}">App: ${app?.name||'N/D'}</span>
+    </div>
+    <div class="secret-row">Senha: ${mask()} · MAC: ${mask()} · Key: ${mask()}</div>
+    <button data-edit="${c.id}" class="ghost">Editar</button>
+  </article>`;
+}
+
+async function loadBase(){
+  const [servers, apps] = await Promise.all([api('/servidores'), api('/aplicativos')]);
+  state.servers = servers; state.apps = apps;
+}
+
+async function renderClientes(){
+  const app = el('app');
+  app.innerHTML = `<section class="card"><h2>Clientes</h2>
+    <form id="filtros" class="grid">
+      <input name="q" placeholder="Buscar por nome ou telefone" />
+      <select name="status"><option value="">Todos status</option><option>em_dia</option><option>atrasado</option><option>suspenso</option></select>
+      <select name="servidor"><option value="">Todos servidores</option>${state.servers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
+      <select name="app"><option value="">Todos apps</option>${state.apps.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select>
+      <button>Buscar</button>
+    </form>
+    <form id="novoCliente" class="grid compact"></form>
+    <div id="listaClientes" class="list"></div>
+  </section>`;
+  renderClienteForm();
+  async function buscar(q=''){
+    let data = await api(`/clientes?page=1&limit=50&q=${encodeURIComponent(q.toLowerCase())}`);
+    const f = new FormData(el('filtros'));
+    const status=f.get('status'), server=f.get('servidor'), appId=f.get('app');
+    let items = data.items || [];
+    if(status) items = items.filter(i=>i.status===status);
+    if(server) items = items.filter(i=>i.primary_server_id===server);
+    if(appId) items = items.filter(i=>i.app_id===appId);
+    state.customers = items;
+    el('listaClientes').innerHTML = items.length ? items.map(customerCard).join('') : '<p>Nenhum cliente encontrado.</p>';
+    document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>renderClienteForm(items.find(i=>i.id===b.dataset.edit)));
+  }
+  el('filtros').onsubmit = (e)=>{e.preventDefault(); buscar(new FormData(e.target).get('q')||'');};
+  await buscar('');
+}
+
+function renderClienteForm(edit){
+  const f = el('novoCliente');
+  f.innerHTML = `<input name="name" placeholder="Nome" value="${edit?.name||''}" required>
+  <input name="whatsapp_e164" placeholder="Telefone" value="${edit?.whatsapp_e164||''}" required>
+  <input name="amount_cents" type="number" placeholder="Valor (centavos)" value="${edit?.amount_cents||''}">
+  <input name="due_date" type="date" value="${edit?.due_date||''}">
+  <select name="status"><option ${!edit||edit.status==='em_dia'?'selected':''}>em_dia</option><option ${edit?.status==='atrasado'?'selected':''}>atrasado</option><option ${edit?.status==='suspenso'?'selected':''}>suspenso</option></select>
+  <select name="primary_server_id"><option value="">Servidor principal</option>${state.servers.map(s=>`<option value="${s.id}" ${edit?.primary_server_id===s.id?'selected':''}>${s.name}</option>`).join('')}</select>
+  <select name="app_id" id="appSelect"><option value="">Aplicativo</option>${state.apps.map(a=>`<option value="${a.id}" ${edit?.app_id===a.id?'selected':''}>${a.name}</option>`).join('')}</select>
+  <input name="alternative_server_ids" placeholder="Servidores alternativos (ids separados por vírgula)" value="${(edit?.alternative_server_ids||[]).join(',')}">
+  <div id="dynamicFields"></div>
+  <textarea name="notes" placeholder="Observações">${edit?.notes||''}</textarea>
+  <button>${edit?'Salvar edição':'Criar cliente'}</button>`;
+  const appSelect = el('appSelect');
+  const dyn = el('dynamicFields');
+  function redrawDynamic(){
+    const picked = state.apps.find(a=>a.id===appSelect.value);
+    if(!picked){ dyn.innerHTML=''; return; }
+    dyn.innerHTML = `${picked.requires_username?'<input name="username" placeholder="Usuário">':''}
+    ${picked.requires_password?'<input name="password" placeholder="Senha">':''}
+    ${picked.requires_mac?'<input name="mac" placeholder="MAC">':''}
+    ${picked.requires_key?'<input name="key" placeholder="Key">':''}
+    ${picked.requires_link?'<input name="link_dns" placeholder="Link/DNS">':''}`;
+  }
+  appSelect.onchange = redrawDynamic; redrawDynamic();
+  f.onsubmit = async (e)=>{e.preventDefault();
+    try{
+      const body = Object.fromEntries(new FormData(f).entries());
+      body.amount_cents = Number(body.amount_cents||0);
+      body.alternative_server_ids = String(body.alternative_server_ids||'').split(',').map(x=>x.trim()).filter(Boolean);
+      const path = edit ? `/clientes/${edit.id}` : '/clientes';
+      const method = edit ? 'PATCH' : 'POST';
+      await api(path, {method, body: JSON.stringify(body)});
+      setFeedback(edit?'Cliente atualizado com sucesso.':'Cliente criado com sucesso.');
+      renderClientes();
+    }catch(err){ setFeedback(err.message,'err'); }
+  };
+}
+
+async function renderServidores(){
+  const app=el('app');
+  const servers = await api('/servidores'); state.servers=servers;
+  app.innerHTML = `<section class="card"><h2>Servidores</h2><form id="novoServidor" class="grid compact">
+    <input name="name" placeholder="Nome" required><input name="color" type="color" value="#777777"><select name="status"><option>ativo</option><option>manutencao</option></select><input name="fixed_link" placeholder="Link fixo"><textarea name="notes" placeholder="Observações"></textarea><button>Cadastrar servidor</button>
+  </form><div class="list">${servers.map(s=>`<article class="mini-card"><strong>${s.name}</strong><span class="chip" style="--chip:${s.color}">${s.status}</span><small>${s.clientes_count||0} clientes</small></article>`).join('')}</div></section>`;
+  el('novoServidor').onsubmit=async(e)=>{e.preventDefault();try{await api('/servidores',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.target).entries()))});setFeedback('Servidor cadastrado.');renderServidores();}catch(err){setFeedback(err.message,'err');}};
+}
+
+async function renderAplicativos(){
+  const app=el('app');
+  const apps = await api('/aplicativos'); state.apps=apps;
+  app.innerHTML = `<section class="card"><h2>Aplicativos</h2><form id="novoApp" class="grid compact">
+  <input name="name" placeholder="Nome" required><input name="color" type="color" value="#999999">
+  <label><input type="checkbox" name="requires_username"> Usuário</label><label><input type="checkbox" name="requires_password"> Senha</label><label><input type="checkbox" name="requires_mac"> MAC</label><label><input type="checkbox" name="requires_key"> Key</label><label><input type="checkbox" name="requires_link"> Link</label>
+  <textarea name="support_message" placeholder="Mensagem de suporte"></textarea><button>Cadastrar aplicativo</button></form>
+  <div class="list">${apps.map(a=>`<article class="mini-card"><strong>${a.name}</strong><span class="chip" style="--chip:${a.color}">${a.color}</span></article>`).join('')}</div></section>`;
+  el('novoApp').onsubmit=async(e)=>{e.preventDefault();try{const fd=new FormData(e.target);const body=Object.fromEntries(fd.entries());['requires_username','requires_password','requires_mac','requires_key','requires_link'].forEach(k=>body[k]=fd.get(k)==='on');await api('/aplicativos',{method:'POST',body:JSON.stringify(body)});setFeedback('Aplicativo cadastrado.');renderAplicativos();}catch(err){setFeedback(err.message,'err');}};
+}
+
+async function router(){
+  setFeedback('');
+  try {
+    await loadBase();
+    const p = location.pathname;
+    if(p==='/servidores') return renderServidores();
+    if(p==='/aplicativos') return renderAplicativos();
+    return renderClientes();
+  } catch (err){ setFeedback(err.message,'err'); el('app').innerHTML='<section class="card"><p>Erro ao carregar dados. Tente novamente.</p></section>'; }
+}
+
+document.addEventListener('click', e=>{ const a=e.target.closest('[data-link]'); if(!a) return; e.preventDefault(); history.pushState({},'',a.getAttribute('href')); router();});
+window.addEventListener('popstate', router);
+router();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}
+</script>
+</body>
+</html>
