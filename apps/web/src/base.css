@@ -1,6 +1,14 @@
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden;font-family:system-ui}
-.container{max-width:720px;margin:0 auto;padding:12px;display:grid;gap:12px}
-.card{border:1px solid #ddd;border-radius:12px;padding:12px;background:#fff}
-button,input,select{max-width:100%}
-.sr-only{position:absolute;left:-9999px}
+:root{--bg:#0b1020;--panel:#121a2f;--txt:#eef3ff;--muted:#98a6c7;--ok:#1f9d57;--err:#d04646}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,sans-serif}
+.container{max-width:960px;margin:auto;padding:12px}
+.card,.topbar{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs a{color:var(--txt);text-decoration:none;padding:8px 10px;border-radius:10px;background:#1b2645}
+.grid{display:grid;grid-template-columns:1fr;gap:8px}.compact{margin-top:10px}
+input,select,textarea,button{width:100%;max-width:100%;padding:10px;border-radius:10px;border:1px solid #2f3d63;background:#0e1528;color:var(--txt)}
+button{background:#2d4fd8;border:0}.ghost{background:#223051}
+.list{display:grid;gap:8px;margin-top:10px}.mini-card{background:#0e1528;padding:10px;border-radius:12px}
+.row{display:flex;gap:8px}.between{justify-content:space-between;align-items:center}.meta{color:var(--muted);font-size:.92rem}.secret-row{color:var(--muted);font-size:.85rem;margin:8px 0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.chip{background:color-mix(in srgb,var(--chip) 30%,#0e1528);border:1px solid var(--chip);padding:2px 8px;border-radius:999px;font-size:.78rem}
+.badge{font-size:.75rem;padding:2px 8px;border-radius:999px;background:#39445f}.badge.em_dia{background:#1c5e3a}.badge.atrasado{background:#7b4e12}.badge.suspenso{background:#6d2431}
+.feedback{padding:8px 10px;border-radius:10px;margin-bottom:10px}.feedback.ok{background:rgba(31,157,87,.2)}.feedback.err{background:rgba(208,70,70,.2)}
+@media (min-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.grid>textarea,.grid>button,.grid>#dynamicFields{grid-column:1/-1}}
