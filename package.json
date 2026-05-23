@@ -1,0 +1,11 @@
+{
+  "name": "cobranca-ia-saas",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:api": "npm --workspace apps/api run dev",
+    "build": "npm -ws run build",
+    "lint": "npm -ws run lint"
+  }
+}

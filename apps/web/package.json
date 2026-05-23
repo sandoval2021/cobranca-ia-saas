@@ -1,0 +1,9 @@
+{
+  "name": "web",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'web em fundação'",
+    "build": "echo 'build web base'",
+    "lint": "echo 'lint web base'"
+  }
+}
