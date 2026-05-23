@@ -110,3 +110,76 @@ function adminSummary(ctx){
 }
 
 module.exports={startTrial,connectMp,createCharge,processWebhook,confirmRenewal,ownerSummary,adminSummary};
+
+function normalizeChargeStatus(charge){
+  if (charge.status === 'cancelado') return 'cancelado';
+  if (charge.status === 'aprovado') return 'pago';
+  if (charge.status === 'aguardando_confirmacao') return 'aguardando confirmação';
+  const dueAt = charge.due_date ? new Date(charge.due_date).getTime() : null;
+  if (dueAt && Number.isFinite(dueAt) && dueAt < Date.now()) return 'vencido';
+  return 'pendente';
+}
+
+function listCharges(ctx, query={}) {
+  assertCompany(ctx);
+  const q = String(query.q || '').toLowerCase().trim();
+  const status = String(query.status || '').trim();
+  const limit = Math.min(Math.max(Number(query.limit || 50), 1), 200);
+  let items = db.finance.charges
+    .filter(c => c.company_id === ctx.companyId)
+    .map(c => ({ ...c, ui_status: normalizeChargeStatus(c) }));
+  if (q) items = items.filter(c => `${c.customer_id} ${c.external_reference}`.toLowerCase().includes(q));
+  if (status) items = items.filter(c => c.ui_status === status);
+  items.sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+  return { items: items.slice(0, limit), total: items.length };
+}
+
+function listPayments(ctx, query={}) {
+  assertCompany(ctx);
+  const q = String(query.q || '').toLowerCase().trim();
+  const limit = Math.min(Math.max(Number(query.limit || 50), 1), 200);
+  const chargesById = new Map(db.finance.charges.filter(c=>c.company_id===ctx.companyId).map(c=>[c.id,c]));
+  let items = db.finance.txs
+    .filter(t => t.company_id === ctx.companyId)
+    .map(t => {
+      const charge = chargesById.get(t.charge_id);
+      return {
+        ...t,
+        charge_amount_cents: charge?.amount_cents || 0,
+        customer_id: charge?.customer_id || null,
+        charge_external_reference: charge?.external_reference || null,
+        ui_status: t.provider_status === 'approved' ? 'pago' : 'aguardando confirmação'
+      };
+    });
+  if (q) items = items.filter(p => `${p.provider_payment_id} ${p.customer_id || ''}`.toLowerCase().includes(q));
+  items.sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+  return { items: items.slice(0, limit), total: items.length };
+}
+
+function upcomingDueDates(ctx) {
+  assertCompany(ctx);
+  const horizon = Date.now() + 7 * 86400000;
+  const items = db.finance.charges
+    .filter(c => c.company_id === ctx.companyId && c.due_date)
+    .filter(c => {
+      const ts = new Date(c.due_date).getTime();
+      return Number.isFinite(ts) && ts >= Date.now() && ts <= horizon;
+    })
+    .map(c => ({ ...c, ui_status: normalizeChargeStatus(c) }))
+    .sort((a,b)=>new Date(a.due_date).getTime()-new Date(b.due_date).getTime());
+  return { items, total: items.length };
+}
+
+function financeHistory(ctx) {
+  assertCompany(ctx);
+  const renewal = db.finance.renewalTasks
+    .filter(t => t.company_id === ctx.companyId)
+    .map(t => ({ type:'renewal_task', ...t }));
+  const charges = db.finance.charges
+    .filter(c => c.company_id === ctx.companyId)
+    .map(c => ({ type:'charge', id:c.id, status:normalizeChargeStatus(c), created_at:c.created_at, customer_id:c.customer_id, amount_cents:c.amount_cents, charge_id:c.id }));
+  const items = [...renewal, ...charges].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
+  return { items, total: items.length };
+}
+
+module.exports={startTrial,connectMp,createCharge,processWebhook,confirmRenewal,ownerSummary,adminSummary,listCharges,listPayments,upcomingDueDates,financeHistory};
