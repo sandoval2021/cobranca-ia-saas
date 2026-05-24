@@ -1,5 +1,7 @@
 # Guia de validação manual (staging)
 
+> Atualizado em 2026-05-24: checklist funcional ainda pendente de execução em staging online.
+
 ## Pré-condições
 - Staging publicado com dados fictícios.
 - Sem integrações reais habilitadas.
