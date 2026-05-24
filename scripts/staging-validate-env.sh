@@ -9,16 +9,15 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 required_vars=(
+  STAGING_MODE
+  NODE_ENV
   APP_ENCRYPTION_KEY
   WEBHOOK_SHARED_SECRET
-  OPENAI_API_KEY
-  EVOLUTION_API_URL
-  EVOLUTION_API_KEY
-  MERCADO_PAGO_CLIENT_ID
-  MERCADO_PAGO_CLIENT_SECRET
-  RESEND_API_KEY
   SUPABASE_URL
   SUPABASE_SERVICE_ROLE_KEY
+  ALLOW_REAL_PAYMENTS
+  ALLOW_REAL_WHATSAPP
+  ALLOW_REAL_AI
 )
 
 missing=0
@@ -33,4 +32,25 @@ if [[ "$missing" -ne 0 ]]; then
   exit 1
 fi
 
-echo "[OK] Todas as variáveis obrigatórias foram encontradas em $ENV_FILE"
+staging_mode="$(grep -E '^STAGING_MODE=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2-)"
+node_env="$(grep -E '^NODE_ENV=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2-)"
+
+if [[ "$staging_mode" != "true" ]]; then
+  echo "[ERRO] STAGING_MODE deve ser true"
+  exit 1
+fi
+
+if [[ "$node_env" == "production" ]]; then
+  echo "[ERRO] NODE_ENV=production é proibido em staging"
+  exit 1
+fi
+
+if grep -E '^MERCADO_PAGO_ACCESS_TOKEN=APP_USR-' "$ENV_FILE" >/dev/null && ! grep -E '^ALLOW_REAL_PAYMENTS=true' "$ENV_FILE" >/dev/null; then
+  echo "[ALERTA] Token real de pagamento detectado sem ALLOW_REAL_PAYMENTS=true"
+fi
+
+if grep -E '^EVOLUTION_API_URL=.*api\.whatsapp\.com' "$ENV_FILE" >/dev/null && ! grep -E '^ALLOW_REAL_WHATSAPP=true' "$ENV_FILE" >/dev/null; then
+  echo "[ALERTA] Endpoint WhatsApp real detectado sem ALLOW_REAL_WHATSAPP=true"
+fi
+
+echo "[OK] Validação de ambiente staging concluída com sucesso: $ENV_FILE"
