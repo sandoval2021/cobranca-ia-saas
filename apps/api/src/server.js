@@ -2,6 +2,7 @@ const http = require('http');
 const { randomUUID } = require('crypto');
 const { log } = require('./observability/logger');
 const { AppError } = require('./observability/errors');
+const { assertStagingEnvironment } = require('./shared/staging-guards');
 const { authRouter } = require('./modules/auth/auth-controller');
 const { companyRouter } = require('./modules/companies/company-controller');
 const { appsRouter } = require('./modules/apps-catalog/apps-controller');
@@ -23,6 +24,13 @@ function ensureSecurityEnv() {
 }
 
 ensureSecurityEnv();
+const stagingValidation = assertStagingEnvironment();
+if (stagingValidation.suspiciousCredentials.length) {
+  log('warn', 'staging_credenciais_suspeitas', {
+    vars: stagingValidation.suspiciousCredentials,
+    aviso: 'Credenciais potencialmente reais detectadas sem flags explícitas.'
+  });
+}
 
 const server = http.createServer(async (req, res) => {
   const requestId = req.headers['x-request-id'] || randomUUID();

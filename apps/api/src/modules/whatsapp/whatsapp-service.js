@@ -2,6 +2,7 @@ const { db, id, now } = require('../../shared/store');
 const { encryptText } = require('../../shared/crypto');
 const { AppError } = require('../../observability/errors');
 const { registerAuditEvent } = require('../audit/audit-service');
+const { assertRealWhatsappAllowed } = require('../../shared/staging-guards');
 
 if (!db.wa) db.wa = { instances: [], events: [], dedup: [], queue: [], messages: [], webhook: [] };
 
@@ -42,6 +43,7 @@ async function enqueueSend(ctx, input){
 function retryAt(attempt){ const seq=[0,30,120,600]; return new Date(Date.now()+seq[Math.min(attempt,3)]*1000).toISOString(); }
 
 async function processQueue(ctx){
+  assertRealWhatsappAllowed();
   assertCompany(ctx); const i=getInstance(ctx); if(!i) throw new AppError('Instância não encontrada',404);
   const allowed=canSend(i); if(!allowed.ok){ autoPauseByStatus(i); return {processed:0,paused:true,reason:allowed.reason}; }
   let processed=0;
@@ -64,6 +66,7 @@ async function processQueue(ctx){
 }
 
 async function receiveWebhook(input,headers){
+  assertRealWhatsappAllowed();
   const shared = process.env.WEBHOOK_SHARED_SECRET || '';
   if (!shared) throw new AppError('Webhook indisponível', 503);
   const provided = String(headers['x-webhook-secret'] || '');

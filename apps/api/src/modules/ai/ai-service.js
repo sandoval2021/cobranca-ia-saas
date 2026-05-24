@@ -1,6 +1,7 @@
 const { db, id, now } = require('../../shared/store');
 const { AppError } = require('../../observability/errors');
 const { registerAuditEvent } = require('../audit/audit-service');
+const { assertRealAIAllowed } = require('../../shared/staging-guards');
 
 if (!db.ai) db.ai = { settings: [], conversations: [], intents: [], messages: [], guards: [], handoff: [], loop: [], memory: [] };
 
@@ -24,6 +25,7 @@ async function configure(ctx, input){ assertCompany(ctx); const s=getSettings(ct
 
 async function processMessage(ctx, input){
   assertCompany(ctx);
+  assertRealAIAllowed();
   const s=getSettings(ctx);
   if(!s.enabled) throw new AppError('IA desativada para esta empresa',409);
   const conv=getConversation(ctx,input.thread_key||input.customer_phone||id(),input.customer_id||null);

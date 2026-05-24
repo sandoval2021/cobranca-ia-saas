@@ -3,6 +3,7 @@ const { db, id, now } = require('../../shared/store');
 const { encryptText } = require('../../shared/crypto');
 const { AppError } = require('../../observability/errors');
 const { registerAuditEvent } = require('../audit/audit-service');
+const { assertRealPaymentsAllowed } = require('../../shared/staging-guards');
 
 if (!db.finance) {
   db.finance = {
@@ -25,6 +26,7 @@ async function startTrial(ctx) {
 
 async function connectMp(ctx, input) {
   assertCompany(ctx);
+  assertRealPaymentsAllowed();
   const accessToken = input.access_token || '';
   const refreshToken = input.refresh_token || '';
   const conn = { id:id(), company_id:ctx.companyId, status:'connected', mp_user_id:input.mp_user_id || null, access_token_enc:encryptText(accessToken), refresh_token_enc:encryptText(refreshToken), connected_at:now() };
@@ -53,6 +55,7 @@ async function createCharge(ctx, input) {
 function validateWebhookSignature(sig) { return Boolean(sig && sig.length >= 10); }
 
 async function processWebhook(input, headers) {
+  assertRealPaymentsAllowed();
   const shared = process.env.WEBHOOK_SHARED_SECRET || '';
   if (!shared) throw new AppError('Confirmação automática indisponível', 503);
   const provided = String(headers['x-webhook-secret'] || '');
