@@ -395,8 +395,18 @@ with check (company_id in (select current_user_company_ids()) or current_user_is
 -- MIGRATION 0013_phase2_financial_contract.sql
 -- ==================================================
 
-create type if not exists charge_status as enum ('pendente','aprovado','falhou','cancelado','expirado');
-create type if not exists renewal_status as enum ('pendente','concluida','cancelada');
+do $$
+begin
+  create type charge_status as enum ('pendente','aprovado','falhou','cancelado','expirado');
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create type renewal_status as enum ('pendente','concluida','cancelada');
+exception
+  when duplicate_object then null;
+end $$;
 
 alter table company_subscriptions alter column status type text;
 alter table company_subscriptions add column if not exists trial_started_at timestamptz;
@@ -571,9 +581,24 @@ with check (company_id in (select current_user_company_ids()) or current_user_is
 -- MIGRATION 0015_phase3_whatsapp_contract.sql
 -- ==================================================
 
-create type if not exists wa_instance_status as enum ('conectado','desconectado','pausado','falha');
-create type if not exists wa_queue_status as enum ('pendente','enviando','enviado','falha_retry','falha_final','pausado');
-create type if not exists wa_msg_direction as enum ('saida','entrada');
+do $$
+begin
+  create type wa_instance_status as enum ('conectado','desconectado','pausado','falha');
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create type wa_queue_status as enum ('pendente','enviando','enviado','falha_retry','falha_final','pausado');
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create type wa_msg_direction as enum ('saida','entrada');
+exception
+  when duplicate_object then null;
+end $$;
 
 create table if not exists wa_instances (
   id uuid primary key default gen_random_uuid(),
