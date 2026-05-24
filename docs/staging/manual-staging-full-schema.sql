@@ -8,11 +8,36 @@
 
 create extension if not exists pgcrypto;
 
-create type app_role as enum ('super_admin', 'owner');
-create type subscription_status as enum ('trial', 'active', 'past_due', 'paused', 'blocked', 'canceled');
-create type server_status as enum ('ativo', 'instavel', 'fora_do_ar');
-create type route_status as enum ('ativa', 'reserva', 'inativa');
-create type message_direction as enum ('entrada', 'saida');
+do $$
+begin
+  create type app_role as enum ('super_admin', 'owner');
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create type subscription_status as enum ('trial', 'active', 'past_due', 'paused', 'blocked', 'canceled');
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create type server_status as enum ('ativo', 'instavel', 'fora_do_ar');
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create type route_status as enum ('ativa', 'reserva', 'inativa');
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create type message_direction as enum ('entrada', 'saida');
+exception
+  when duplicate_object then null;
+end $$;
 
 -- ==================================================
 -- MIGRATION 0002_companies_and_users_metadata.sql
@@ -294,40 +319,135 @@ alter table ai_interactions enable row level security;
 alter table audit_events enable row level security;
 alter table sensitive_data_views enable row level security;
 
-create policy company_select_own on companies for select using (
+do $$
+begin
+  create policy company_select_own on companies for select using (
   id in (select current_user_company_ids()) or current_user_is_super_admin()
 );
-create policy users_metadata_self on users_metadata for select using (id = auth.uid() or current_user_is_super_admin());
-create policy members_own_company on company_members for select using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy users_metadata_self on users_metadata for select using (id = auth.uid() or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy members_own_company on company_members for select using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_customers_all on customers
+do $$
+begin
+  create policy company_scoped_customers_all on customers
 for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_servers_all on servers
+do $$
+begin
+  create policy company_scoped_servers_all on servers
 for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_server_routes_all on server_routes
+do $$
+begin
+  create policy company_scoped_server_routes_all on server_routes
 for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_apps_all on apps_catalog
+do $$
+begin
+  create policy company_scoped_apps_all on apps_catalog
 for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_common_all on owner_profiles for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_links_all on customer_server_links for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_creds_all on customer_access_credentials for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_subs_all on company_subscriptions for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_mp_all on mp_connections for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_wa_all on whatsapp_connections for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_messages_all on messages for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_ai_all on ai_interactions for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy audit_events_select on audit_events for select using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy audit_events_insert on audit_events for insert with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy sensitive_views_select on sensitive_data_views for select using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy sensitive_views_insert on sensitive_data_views for insert with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+do $$
+begin
+  create policy company_scoped_common_all on owner_profiles for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_links_all on customer_server_links for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_creds_all on customer_access_credentials for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_subs_all on company_subscriptions for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_mp_all on mp_connections for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_wa_all on whatsapp_connections for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_messages_all on messages for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_ai_all on ai_interactions for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin()) with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy audit_events_select on audit_events for select using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy audit_events_insert on audit_events for insert with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy sensitive_views_select on sensitive_data_views for select using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy sensitive_views_insert on sensitive_data_views for insert with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
 -- ==================================================
 -- MIGRATION 0011_phase1_operational_base.sql
@@ -383,13 +503,23 @@ create index if not exists idx_routes_company_server_priority on server_routes(c
 alter table server_route_switch_history enable row level security;
 alter table customer_history_events enable row level security;
 
-create policy company_scoped_route_switch_all on server_route_switch_history
+do $$
+begin
+  create policy company_scoped_route_switch_all on server_route_switch_history
 for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_customer_history_all on customer_history_events
+do $$
+begin
+  create policy company_scoped_customer_history_all on customer_history_events
 for all using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
 -- ==================================================
 -- MIGRATION 0013_phase2_financial_contract.sql
@@ -541,41 +671,96 @@ alter table renewal_tasks enable row level security;
 alter table renewal_task_events enable row level security;
 alter table financial_audit_events enable row level security;
 
-create policy billing_plans_read on billing_plans for select using (true);
+do $$
+begin
+  create policy billing_plans_read on billing_plans for select using (true);
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_subscription_events on subscription_events for all
+do $$
+begin
+  create policy company_scoped_subscription_events on subscription_events for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_charges on customer_charges for all
+do $$
+begin
+  create policy company_scoped_charges on customer_charges for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_transactions on payment_transactions for all
+do $$
+begin
+  create policy company_scoped_transactions on payment_transactions for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_webhook_events on payment_webhook_events for all
+do $$
+begin
+  create policy company_scoped_webhook_events on payment_webhook_events for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_fee_ledger on platform_fee_ledger for select
+do $$
+begin
+  create policy company_scoped_fee_ledger on platform_fee_ledger for select
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy company_scoped_fee_ledger_insert on platform_fee_ledger for insert
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy company_scoped_fee_ledger_insert on platform_fee_ledger for insert
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_renewal_tasks on renewal_tasks for all
+do $$
+begin
+  create policy company_scoped_renewal_tasks on renewal_tasks for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy company_scoped_renewal_events on renewal_task_events for all
+do $$
+begin
+  create policy company_scoped_renewal_events on renewal_task_events for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy fin_audit_select on financial_audit_events for select
+do $$
+begin
+  create policy fin_audit_select on financial_audit_events for select
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy fin_audit_insert on financial_audit_events for insert
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy fin_audit_insert on financial_audit_events for insert
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
 -- ==================================================
 -- MIGRATION 0015_phase3_whatsapp_contract.sql
@@ -702,29 +887,59 @@ alter table wa_outbox_queue enable row level security;
 alter table wa_messages enable row level security;
 alter table wa_webhook_events enable row level security;
 
-create policy wa_instances_scope on wa_instances for all
+do $$
+begin
+  create policy wa_instances_scope on wa_instances for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy wa_events_scope on wa_instance_events for all
+do $$
+begin
+  create policy wa_events_scope on wa_instance_events for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy wa_dedup_scope on wa_dedup_registry for all
+do $$
+begin
+  create policy wa_dedup_scope on wa_dedup_registry for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy wa_queue_scope on wa_outbox_queue for all
+do $$
+begin
+  create policy wa_queue_scope on wa_outbox_queue for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy wa_messages_scope on wa_messages for all
+do $$
+begin
+  create policy wa_messages_scope on wa_messages for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
-create policy wa_webhook_scope on wa_webhook_events for all
+do $$
+begin
+  create policy wa_webhook_scope on wa_webhook_events for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
 -- ==================================================
 -- MIGRATION 0017_phase4_ai_contract.sql
@@ -856,28 +1071,68 @@ alter table ai_handoff_queue enable row level security;
 alter table ai_loop_protection enable row level security;
 alter table ai_memory_snapshots enable row level security;
 
-create policy ai_settings_scope on ai_company_settings for all
+do $$
+begin
+  create policy ai_settings_scope on ai_company_settings for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy ai_conversations_scope on ai_conversations for all
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy ai_conversations_scope on ai_conversations for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy ai_intents_scope on ai_intent_events for all
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy ai_intents_scope on ai_intent_events for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy ai_messages_scope on ai_messages for all
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy ai_messages_scope on ai_messages for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy ai_guard_scope on ai_guardrail_events for all
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy ai_guard_scope on ai_guardrail_events for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy ai_handoff_scope on ai_handoff_queue for all
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy ai_handoff_scope on ai_handoff_queue for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy ai_loop_scope on ai_loop_protection for all
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy ai_loop_scope on ai_loop_protection for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
-create policy ai_memory_scope on ai_memory_snapshots for all
+exception
+  when duplicate_object then null;
+end $$;
+do $$
+begin
+  create policy ai_memory_scope on ai_memory_snapshots for all
 using (company_id in (select current_user_company_ids()) or current_user_is_super_admin())
 with check (company_id in (select current_user_company_ids()) or current_user_is_super_admin());
+exception
+  when duplicate_object then null;
+end $$;
 
