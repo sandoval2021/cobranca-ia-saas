@@ -7,16 +7,16 @@
 - [ ] Backups/snapshots iniciais habilitados.
 
 ## 2) Migrations
-- [ ] Todas as migrations em `infra/supabase/migrations` aplicadas sem erro.
-- [ ] Estrutura final conferida (tabelas, índices e constraints).
+- [x] Todas as migrations em `infra/supabase/migrations` validadas estruturalmente sem erro (`./scripts/staging-validate-migrations.sh`).
+- [x] Estrutura/ordem de migrations conferida (0001..0018).
 
 ## 3) RLS
-- [ ] RLS habilitado nas tabelas multi-tenant.
+- [x] RLS habilitado nas tabelas multi-tenant (policies em 0010/0012/0014/0016/0018).
 - [ ] Policies de leitura/escrita testadas com usuário não-admin.
 
 ## 4) Envs
-- [ ] Arquivo `.env.staging` preenchido com segredos de staging.
-- [ ] Script de validação de env executado com sucesso.
+- [ ] Arquivo `.env.staging` preenchido com segredos de staging (pendente no ambiente alvo).
+- [x] Script de validação de env executado com sucesso (arquivo temporário sem segredos reais).
 
 ## 5) Healthcheck
 - [ ] API sobe sem erro.

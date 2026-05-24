@@ -16,13 +16,30 @@
    ./scripts/staging-validate-env.sh .env.staging
    ```
 
-## 2) Rodar migrations
+## 2) Rodar migrations (opção preferencial: Supabase CLI)
 ```bash
 ./scripts/staging-validate-migrations.sh
+
+# autenticar (token pessoal; não versionar)
+supabase login
+
+# pegar PROJECT_REF de staging no dashboard Supabase:
+# Project Settings -> General -> Reference ID
+supabase link --project-ref <PROJECT_REF_STAGING>
+
+# validação de segurança: confirmar projeto linkado é o de staging
+cat supabase/config.toml | rg 'project_id|project_ref'
+
+# aplicar migrations pendentes no projeto linkado
+supabase db push
 ```
 
-## 3) Aplicar seed demo
+## 3) Aplicar seed demo (sem psql, via Supabase CLI)
 ```bash
+# opção A: query única com arquivo local
+supabase db query < infra/supabase/seeds/0001_staging_demo_seed.sql
+
+# opção B (avançada): via psql
 psql "$SUPABASE_DB_URL" -f infra/supabase/seeds/0001_staging_demo_seed.sql
 ```
 
